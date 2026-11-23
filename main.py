@@ -151,17 +151,18 @@ def delete_note(
 
 @app.get('/notes',response_model=NotesListResponse)
 def get_notes(
-    session : DbSession,
-    page :int = Query(default=1, ge=1),
-    limit : int = Query(default=10, ge= 1, le=100),
-    search : str | None=None,
-    has_content : bool | None = None
+    session: DbSession,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge= 1, le=100),
+    search: str | None=None,
+    has_content: bool | None = None
 ):
+
+    #pagination 
     offset = (page-1) * limit
 
-    # Build the main query
+    #buid the main db query
     stmt = select(Note)
-
 
     if search :
         stmt = select(Note).where(Note.title.ilike(f"%{search}%"))
@@ -175,12 +176,14 @@ def get_notes(
         stmt=select(Note).where(
             Note.content.is_(None) | (Note.content == "")
             )
-
-   # count matching notes
+    
+    
+    # count matching notes
     count_notes = select(func.count()).select_from(Note)
 
     if search: 
         count_notes= count_notes.where(Note.title.ilike(f"%{search}%"))
+
 
     if has_content is True:
         count_notes= count_notes.where(
@@ -202,16 +205,16 @@ def get_notes(
     has_previous = page > 1
 
 
-    # fetchng pagination
+    # fetchng notes
     stmt = select(Note).order_by(Note.id.asc()).offset(offset).limit(limit)
 
     result = session.execute(stmt)
     notes = result.scalars().all()
 
     return {
-        "total":total,
-        "page":page,
-        "limit":limit,
+        "total": total,
+        "page": page,
+        "limit": limit,
         "total_pages": total_pages,
         "has_next": has_next,
         "has_previous": has_previous,
