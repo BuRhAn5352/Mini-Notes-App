@@ -1,10 +1,10 @@
 from typing import Annotated,Optional
 
 from pydantic import BaseModel, Field, ConfigDict
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, func 
 
 from db import get_db, Note
 
@@ -28,8 +28,18 @@ class NoteResponse(BaseModel):
     id : int
     title : str
     content : str | None = None
-
+    
     model_config = ConfigDict(from_attributes=True)
+
+
+class NotesListResponse(BaseModel):
+    total : int 
+    page : int 
+    limit : int 
+    total_pages : int 
+    has_next : bool
+    has_previous : bool 
+    notes : list[NoteResponse]
 
 #----------- DATABASE DEPENDENCY ---------
 DbSession = Annotated[Session, Depends(get_db)]
@@ -139,12 +149,71 @@ def delete_note(
 
 # GET ALL THE NOTES
 
-@app.get('/notes',response_model=list[NoteResponse])
+@app.get('/notes',response_model=NotesListResponse)
 def get_notes(
-    session : DbSession
+    session : DbSession,
+    page :int = Query(default=1, ge=1),
+    limit : int = Query(default=10, ge= 1, le=100),
+    search : str | None=None,
+    has_content : bool | None = None
 ):
-    stmt = select(Note)
-    result = session.execute(stmt)
-    notes = result.scalars(stmt).all()
+    offset = (page-1) * limit
 
-    return notes
+    # Build the main query
+    stmt = select(Note)
+
+
+    if search :
+        stmt = select(Note).where(Note.title.ilike(f"%{search}%"))
+
+    if has_content is True:
+        stmt=select(Note).where(
+            Note.content.is_not(None) & (Note.content != "")
+            )
+
+    elif has_content is False:
+        stmt=select(Note).where(
+            Note.content.is_(None) | (Note.content == "")
+            )
+
+   # count matching notes
+    count_notes = select(func.count()).select_from(Note)
+
+    if search: 
+        count_notes= count_notes.where(Note.title.ilike(f"%{search}%"))
+
+    if has_content is True:
+        count_notes= count_notes.where(
+            Note.content.is_not(None) & (Note.content != "")
+            )
+
+    elif has_content is False:
+        count_notes  = count_notes.where(
+            Note.content.is_(None) | (Note.content=="")
+        )
+
+    total = session.scalar(count_notes)
+
+    #pagination metadata
+    total_pages = (total + limit -1 ) // limit
+
+
+    has_next = page < total_pages
+    has_previous = page > 1
+
+
+    # fetchng pagination
+    stmt = select(Note).order_by(Note.id.asc()).offset(offset).limit(limit)
+
+    result = session.execute(stmt)
+    notes = result.scalars().all()
+
+    return {
+        "total":total,
+        "page":page,
+        "limit":limit,
+        "total_pages": total_pages,
+        "has_next": has_next,
+        "has_previous": has_previous,
+        "notes" : notes
+    }

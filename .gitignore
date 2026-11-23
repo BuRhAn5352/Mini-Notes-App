@@ -1,23 +1,5 @@
-# Python-generated files
+.venv/
 __pycache__/
-*.py[oc]
-*.py[cod]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-#files
 .env
-.env.*
-
-# Allow example environment file
-!.env.example
-
-
-# IDE
-.vscode/
-.idea/
+*.pyc
+.pytest_cache/
