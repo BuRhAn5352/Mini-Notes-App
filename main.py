@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func 
 
-from db import get_db, Note
+from db import get_db, Note, User
+from schemas import UserCreate, UserResponse
+from security import hash_password
+
+from security import verify_password,create_access_token
 
 
 app = FastAPI()
@@ -46,6 +50,67 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 #-- ROUTES ---
 # HOME
+
+@app.post("/register",
+        response_model = UserResponse,
+        status_code=status.HTTP_201_CREATED
+        )
+
+def register_user(
+    user_data:UserCreate,
+    session : DbSession
+):
+    existing_user = session.scalar(
+        select(User).where(User.email == user_data.email)
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail= "Email already registered"
+        )
+
+    hashed_password= hash_password(user_data.password)
+
+    new_user= User(
+        email=user_data.email,
+        hashed_password = hashed_password
+    )
+
+    session.add(new_user)
+    session.commit()
+    session.refresh(new_user)
+
+    return new_user
+
+@app.post("/login")
+def login(
+    user_data : UserCreate,
+    session : DbSession
+):
+    user = session.scalar(
+        select(Note).where(User.email == user_data.email)
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    if not verify_password(user_data.password,user.hashed_password):
+        raise HTTPException(
+            status_code= status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    access_token = create_access_token(user.id)
+    
+    return {
+        "access_token": access_token,
+        "token_type" : " bearer"
+    }
+
 
 @app.get("/")
 def hello():
