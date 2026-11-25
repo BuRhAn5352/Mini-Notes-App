@@ -13,12 +13,12 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not configured")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
 def create_access_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
-        minutes= ACCESS_TOKEN_EXPIRE_MINTES
+        minutes= ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     payload= {
@@ -33,6 +33,18 @@ def create_access_token(user_id: int) -> str:
     return token
 
 
+def verify_access_token(token:str) -> dict:
+    try:
+        payload = jwt.decode(
+            token, SECRET_KEY, algorithms=[ALGORITHM]
+        )
+
+        return payload
+
+    except jwt.InvalidTokenError:
+        raise ValueError("Invalid or expired token")
+
+
 password_hash = PasswordHash.recommended()
 
 
@@ -42,9 +54,3 @@ def hash_password(password : str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password,hashed_password)
-
-
-
-if __name__ == "__main__":
-    token = create_access_token(1)
-    print(token)
