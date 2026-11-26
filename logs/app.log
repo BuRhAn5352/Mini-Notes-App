@@ -1,0 +1,3 @@
+2026-11-26 18:33:45,378 | INFO | mini_notes | Mini Notes API started
+2026-11-26 18:33:45,379 | WARNING | mini_notes | This is a warning
+2026-11-26 18:33:45,379 | ERROR | mini_notes | This is an error

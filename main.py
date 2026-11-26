@@ -13,6 +13,8 @@ from security import hash_password
 from security import verify_password,create_access_token, verify_access_token
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from logging_config import logger
+
 
 app = FastAPI()
 
@@ -50,6 +52,14 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 bearer_scheme = HTTPBearer()
 
+
+## app startup 
+
+@app.on_event("startup")
+def startup_event():
+    logger.info("Mini Notes API started")
+
+
 # bearer dependency
 
 def get_current_user(
@@ -64,6 +74,7 @@ def get_current_user(
         user_id = int(payload["sub"])
 
     except (ValueError,KeyError,TypeError):
+        logger.warning("Authentication failed: invalid or expired token")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail = "Invalid or expired token",
@@ -73,6 +84,7 @@ def get_current_user(
     user = session.get(User,user_id)
 
     if user is None:
+        logger.warning("Authentication failed : user not found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail= "user not found",
@@ -99,6 +111,7 @@ def register_user(
     )
 
     if existing_user:
+        logger.warning("Registration failed : email already registered")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail= "Email already registered"
@@ -113,6 +126,7 @@ def register_user(
 
     session.add(new_user)
     session.commit()
+    logger.info("New user registered: %s", new_user.id)
     session.refresh(new_user)
 
     return new_user
@@ -127,18 +141,21 @@ def login(
     )
 
     if not user:
+        logger.warning("Login failed: user not found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
     if not verify_password(user_data.password,user.hashed_password):
+        logger.warning("Login failed : Incorrect password")
         raise HTTPException(
             status_code= status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
     access_token = create_access_token(user.id)
+    logger.info("user logged in sucessfully : user_id=%s",user.id)
     
     return {
         "access_token": access_token,
@@ -172,6 +189,10 @@ def create_notes(
 )
     session.add(new_note)
     session.commit()
+    logger.info("Note created: user_id=%s note_id=%s",
+                current_user.id,
+                new_note.id)
+
     session.refresh(new_note)
 
     return new_note
@@ -199,6 +220,12 @@ def get_note(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Note doesn't exist"
         )
+
+    logger.debug(
+        "Note retrieved: user_id=%s note_id=%s",
+        current_user.id,
+        note.id
+    )
 
     return note
 
@@ -237,6 +264,10 @@ def edit_notes(
         setattr(note,field,value)
 
     session.commit()
+    logger.info("Note updated: user_id=%s note_id=%s",
+                current_user.id,
+                note.id
+)
     session.refresh(note)
 
     return {"message": "the note has been updated",
@@ -265,6 +296,10 @@ def delete_note(
 
     session.delete(note)
     session.commit()
+    logger.info("Note deleted: user_id=%s note_id=%s",
+                current_user.id,
+                note.id
+                )
 
     return {
         "message":"the note has been deleted"
