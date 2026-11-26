@@ -1,3 +1,5 @@
 2026-11-26 18:33:45,378 | INFO | mini_notes | Mini Notes API started
 2026-11-26 18:33:45,379 | WARNING | mini_notes | This is a warning
 2026-11-26 18:33:45,379 | ERROR | mini_notes | This is an error
+2026-11-27 04:59:35,195 | INFO | watchfiles.main | 79 changes detected
+2026-11-27 04:59:36,436 | INFO | mini_notes | Mini Notes API started
